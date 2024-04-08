@@ -1,0 +1,2 @@
+gcc conv2d_transpose.c hifi_model_trained_weights.c -o conv2d_transpose
+conv2d_transpose.exe
