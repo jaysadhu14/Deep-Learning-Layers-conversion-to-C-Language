@@ -1,0 +1,266 @@
+import tensorflow as tf
+import numpy as np
+from tensorflow import keras
+from keras.layers import *
+import keras.backend as K
+import h5py
+import re
+
+def is_group(obj):
+    if isinstance(obj, h5py.Group):
+        return True
+    return False
+
+def is_dataset(obj):
+    if isinstance(obj, h5py.Dataset):
+        return True
+    return False
+
+def process_4d_array(op, inp_array):
+    op.write('\n{')
+    index_inp_array=0
+    for r_i, row in enumerate(inp_array):
+        op.write('\n\t{')
+        index_row = 0
+        for c_i, col in enumerate(row):
+            op.write('\n\t\t{')
+            index_col = 0
+            for r_i_1, row_1 in enumerate(col):
+                op.write('\n\t\t\t{')
+                index = 0
+                for val in row_1:
+                    if index == len(row_1) - 1:
+                        op.write(f" {val} ")
+                    else:
+                        op.write(f" {val} ,")
+                    index+=1
+                if index_col == len(col) - 1:
+                    op.write('}')
+                else:
+                    op.write('},')
+                index_col+=1
+            if index_row == len(row) - 1:
+                op.write('\n\t\t}')
+            else:
+                op.write('\n\t\t},')
+            index_row+=1
+        if index_inp_array == len(inp_array) - 1:
+            op.write('\n\t}')
+        else:
+            op.write('\n\t},')
+        index_inp_array+=1
+    op.write('\n};\n')
+
+def process_3d_array(op, inp_array):
+    op.write('\n{')
+    index_inp_array = 0
+    for r_i, row in enumerate(inp_array):
+        op.write('\n\t{')
+        index_row = 0
+        for col in row:
+            op.write('\n\t\t{')
+            index = 0
+            for val in col:
+                if index == len(col) - 1:
+                    op.write(f" {val} ")
+                else:
+                    op.write(f" {val} ,")
+                index+=1
+            if index_row == len(row) - 1:
+                op.write('}')
+            else:
+                op.write('},')
+            index_row+=1
+        if index_inp_array == len(inp_array) - 1:
+            op.write('\n\t},')
+        else:
+            op.write('\n\t}')
+        index_inp_array+=1
+    op.write('\n};\n')
+
+def process_2d_array(op, inp_array):
+    op.write('\n{')
+    index_row = 0
+    for row in inp_array:
+        op.write('\n\t{')
+        index = 0
+        for val in row:
+            if index == (len(row) - 1) :
+                op.write(f" {val} ")
+            else:
+                op.write(f" {val} ,")
+            index+=1
+        if index_row == len(inp_array) - 1:
+            op.write('}')
+        else:
+            op.write('} ,')
+        index_row+=1
+    op.write('\n};\n')
+
+def process_1d_array(op, inp_array):
+    op.write('\n{')
+    index = 0
+    for val in inp_array:
+        if index == (len(inp_array) - 1):
+            op.write(f" {val} ")
+        else:
+            op.write(f" {val} ,")
+        index+=1
+    op.write('\n};\n')
+
+def get_dataset_from_group(datasets, obj):
+    if is_group(obj):
+        for key in obj:
+            x = obj[key]
+            get_dataset_from_group(datasets, x)
+    else:
+        datasets.append(obj)
+
+def process_dataset(name, key, inp_dataset, op_c, op_h):
+    array = np.array(inp_dataset)
+    data_type = (array.dtype)
+    op_c.write("\n")
+    if "gru" in name and "kernel" in key:
+        key = re.sub(r':0$', '', key)
+        # Separate the GRU kernel into update, reset, and candidate arrays
+        num_rows, num_cols = array.shape
+        third_n = num_cols // 3
+
+        update_array = array[:, :third_n]
+        reset_array = array[:, third_n:2*third_n]
+        candidate_array = array[:, 2*third_n:]
+
+        # Write the update array
+        update_name = f"{name}_{key}_update"
+        update_declaration = f"extern {data_type} {update_name}[{num_rows}][{third_n}];\n"
+        op_h.write(update_declaration)
+        op_c.write(f"{data_type} {update_name}[{num_rows}][{third_n}]=")
+        process_2d_array(op_c, update_array)
+
+        # Write the reset array
+        reset_name = f"{name}_{key}_reset"
+        reset_declaration = f"extern {data_type} {reset_name}[{num_rows}][{third_n}];\n"
+        op_h.write(reset_declaration)
+        op_c.write(f"{data_type} {reset_name}[{num_rows}][{third_n}]=")
+        process_2d_array(op_c, reset_array)
+
+        # Write the candidate array
+        candidate_name = f"{name}_{key}_candidate"
+        candidate_declaration = f"extern {data_type} {candidate_name}[{num_rows}][{third_n}];\n"
+        op_h.write(candidate_declaration)
+        op_c.write(f"{data_type} {candidate_name}[{num_rows}][{third_n}]=")
+        process_2d_array(op_c, candidate_array)
+
+        # Write the base array
+        base_name = f"{name}_{key}"
+        base_declaration = f"extern {data_type} {base_name}[{num_rows}][{num_cols}];\n"
+        op_h.write(base_declaration)
+        op_c.write(f"{data_type} {base_name}[{num_rows}][{num_cols}]=")
+        process_2d_array(op_c, array)
+    elif "gru" in name and "bias" in key:
+        key = re.sub(r':0$', '', key)
+
+        # Separate the GRU kernel into update, reset, and candidate arrays
+        num_rows, num_cols = array.shape
+        third_n = num_cols // 3
+
+        update_array_bias = array[:, :third_n]
+        reset_array_bias = array[:, third_n:2*third_n]
+        candidate_array_bias = array[:, 2*third_n:]
+
+        # Write the update array
+        update_bias_name = f"{name}_{key}_update"
+        update_bias_declaration = f"extern {data_type} {update_bias_name}[{num_rows}][{third_n}];\n"
+        op_h.write(update_bias_declaration)
+        op_c.write(f"{data_type} {update_bias_name}[{num_rows}][{third_n}]=")
+        process_2d_array(op_c, update_array_bias)
+
+        # Write the reset array
+        reset_bias_name = f"{name}_{key}_reset"
+        reset_bias_declaration = f"extern {data_type} {reset_bias_name}[{num_rows}][{third_n}];\n"
+        op_h.write(reset_bias_declaration)
+        op_c.write(f"{data_type} {reset_bias_name}[{num_rows}][{third_n}]=")
+        process_2d_array(op_c, reset_array_bias)
+
+        # Write the candidate array
+        candidate_bias_name = f"{name}_{key}_candidate"
+        candidate_bias_declaration = f"extern {data_type} {candidate_bias_name}[{num_rows}][{third_n}];\n"
+        op_h.write(candidate_bias_declaration)
+        op_c.write(f"{data_type} {candidate_bias_name}[{num_rows}][{third_n}]=")
+        process_2d_array(op_c, candidate_array_bias)
+
+        # Write the base array
+        base_bias_name = f"{name}_{key}"
+        base_bias_declaration = f"extern {data_type} {base_bias_name}[{num_rows}][{num_cols}];\n"
+        op_h.write(base_bias_declaration)
+        op_c.write(f"{data_type} {base_bias_name}[{num_rows}][{num_cols}]=")
+        process_2d_array(op_c, array)
+
+
+    else:
+      if array.ndim == 1:
+          weights_name = key.split(':')[0]
+          rows, = array.shape
+          combined_name = f"{data_type} {name}_{weights_name}[{rows}]="
+          op_c.write(combined_name)
+          combined_name_header = f"extern {data_type} {name}_{weights_name}[{rows}];\n"
+          op_h.write(combined_name_header)
+          process_1d_array(op_c, array)
+      elif array.ndim == 2:
+          weights_name = key.split(':')[0]
+          rows,cols = array.shape
+          combined_name = f"{data_type} {name}_{weights_name}[{rows}][{cols}]="
+          op_c.write(combined_name)
+          combined_name_header = f"extern {data_type} {name}_{weights_name}[{rows}][{cols}];\n"
+          op_h.write(combined_name_header)
+          process_2d_array(op_c, array)
+      elif array.ndim == 3:
+          weights_name = key.split(':')[0]
+          rows,cols,other=array.shape
+          combined_name = f"{data_type} {name}_{weights_name}[{rows}][{cols}][{other}]="
+          op_c.write(combined_name)
+          combined_name_header = f"extern {data_type} {name}_{weights_name}[{rows}][{cols}][{other}];\n"
+          op_h.write(combined_name_header)
+          process_3d_array(op_c, array)
+      elif array.ndim == 4:
+          weights_name = key.split(':')[0]
+          rows,cols,row1,col1=array.shape
+          combined_name = f"{data_type} {name}_{weights_name}[{rows}][{cols}][{row1}][{col1}]="
+          op_c.write(combined_name)
+          combined_name_header = f"extern {data_type} {name}_{weights_name}[{rows}][{cols}][{row1}][{col1}];\n"
+          op_h.write(combined_name_header)
+          process_4d_array(op_c, array)
+
+      op_c.flush()
+
+def read_hdf5_model_and_save_weights_in_c(hdf5_file, output_c_file, output_header_file):
+    f = h5py.File(hdf5_file)
+    op_h = open(output_header_file, 'w+')
+    with open(output_c_file, 'w+') as op_c:
+        op_c.write("#include <stdio.h>\n")
+        for layer, g in f.items():
+            for (name,d) in (g.items()):
+                if name=="Adam":
+                    continue;
+                if is_group(d):
+                    for k, v in d.items():
+                        temp = v
+                        parent_group = v
+                        while(is_group(temp)):
+                            for key in temp:
+                                temp=temp[key]
+                                if(is_dataset(temp)):
+                                    break;
+                                parent_group = temp
+                        for p, q in parent_group.items():
+                            if is_dataset(q):
+                                process_dataset(name, p, q, op_c, op_h)
+    f.close()
+    op_c.close()
+    op_h.close()
+
+hdf5_file = r"C:\Users\jayva\Desktop\IPHIPI\temp\extracting_weights_from_h5\hifi_model_trained.h5"
+op_c_file = r"C:\Users\jayva\Desktop\IPHIPI\temp\extracting_weights_from_h5\hifi_model_trained_weights_c.c"
+op_hdr_file = r"C:\Users\jayva\Desktop\IPHIPI\temp\extracting_weights_from_h5\hifi_model_trained_hdr.h"
+
+read_hdf5_model_and_save_weights_in_c(hdf5_file, op_c_file, op_hdr_file)
