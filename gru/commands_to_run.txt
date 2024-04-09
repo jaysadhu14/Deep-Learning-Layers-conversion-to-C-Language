@@ -1,2 +1,2 @@
-gcc gru.c hifi_model_trained_weights.c -o gru
+gcc GRU_WEIGHT_DIVIDED.c weight.c -o gru
 gru.exe
