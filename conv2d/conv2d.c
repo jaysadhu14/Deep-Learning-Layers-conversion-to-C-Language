@@ -197,7 +197,7 @@ float ***convolution(float ***image, int image_height, int image_width, int imag
 
 
     float ***result = (float ***)calloc(sizeof(float **), *output_height);
-    if (result == NULL)
+    if (result == NULL) 
     {
         printf("Error: Memory allocation failed for result array.\n");
         return NULL;
