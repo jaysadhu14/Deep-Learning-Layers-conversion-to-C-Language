@@ -1,0 +1,2 @@
+gcc conv2d_layer.c conv2d_operation.c hifi_model_trained_weights_c.c -o output
+.\output
