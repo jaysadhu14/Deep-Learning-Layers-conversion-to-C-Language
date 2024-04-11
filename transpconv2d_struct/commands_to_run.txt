@@ -1,0 +1,2 @@
+gcc transpconv2d_layer.c transpconv2d_operation.c hifi_model_trained_weights_c.c -o output
+.\output
