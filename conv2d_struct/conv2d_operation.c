@@ -77,9 +77,6 @@ float ****kernel_dilation(float ****filters, int *kernel_height, int *kernel_wid
     *kernel_height = new_kernel_height;
     *kernel_width = new_kernel_width;
 
-    printf("new_kernel_height %d \n", new_kernel_height);
-    printf("new_kernel_width %d \n", new_kernel_width);
-
     return dilated_filters;
 }
 float ***conv2d_execution(float ***image, int image_height, int image_width, int image_channels,
@@ -191,8 +188,8 @@ float ***conv2d_execution(float ***image, int image_height, int image_width, int
                 for (int j = 0; j < *output_width; j++)
                 {
                     float sum = 0.0;
-                    int group_image_channels = (image_channels / num_groups);
-                    for (int c = 0; c < group_image_channels; c++)
+                    int group_kernel_channels = (image_channels / num_groups);
+                    for (int c = 0; c < group_kernel_channels; c++)
                     {
 
                         for (int ki = 0; ki < kernel_height; ki++)
@@ -202,10 +199,11 @@ float ***conv2d_execution(float ***image, int image_height, int image_width, int
                                 // Adjust indices to consider dilation
                                 int padded_i = i * stride[0] + ki;
                                 int padded_j = j * stride[1] + kj;
+                                int group_image_channels = c + (group * group_kernel_channels);
 
                                 if (padded_i < image_height && padded_j < image_width)
                                 {
-                                    sum += image[padded_i][padded_j][c + (group * group_image_channels)] * filters[ki][kj][c][f];
+                                    sum += image[padded_i][padded_j][group_image_channels] * filters[ki][kj][c][f];
                                 }
                             }
                         }
