@@ -127,7 +127,7 @@ float ***conv2d_execution(float ***image, int image_height, int image_width, int
     }
     else if (kernel_height <= 0 || kernel_width <= 0)
     {
-        printf("Error: Calculated kernel dimensions are invalid.\n");
+        printf("Error: Given kernel dimensions are invalid.\n");
         return NULL;
     }
     
