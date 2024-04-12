@@ -9,66 +9,9 @@ int main()
 {
     int dilation_values[2] = {1, 1};
     int stride_values[2] = {1, 1};
+
     transpconv2d_config *config = malloc(sizeof(transpconv2d_config));
-    config->image_channels = sizeof(filter[0][0][0]) / sizeof(filter[0][0][0][0]);
-    config->kernel_height = sizeof(filter) / sizeof(filter[0]);
-    config->kernel_width = sizeof(filter[0]) / sizeof(filter[0][0]);
-    config->num_filters = sizeof(filter[0][0]) / sizeof(filter[0][0][0]);
     config->num_groups = 1;
-
-    config->stride = malloc(2 * sizeof(int));
-    for (int i = 0; i < 2; i++)
-    {
-        config->stride[i] = stride_values[i];
-    }
-
-    config->dilation = malloc(2 * sizeof(int));
-    for (int i = 0; i < 2; i++)
-    {
-        config->dilation[i] = dilation_values[i];
-    }
-
-    config->bias = malloc(config->num_filters * sizeof(float));
-    for (int i = 0; i < config->num_filters; i++)
-    {
-        config->bias[i] = transpconv2d_bias[i];
-    }
-
-    config->filter = malloc(config->kernel_height * sizeof(float ***));
-    for (int i = 0; i < config->kernel_height; i++)
-    {
-        config->filter[i] = malloc(config->kernel_width * sizeof(float **));
-        for (int j = 0; j < config->kernel_width; j++)
-        {
-            config->filter[i][j] = malloc(config->image_channels * sizeof(float *));
-            for (int c = 0; c < config->image_channels; c++)
-            {
-                config->filter[i][j][c] = malloc(config->num_filters * sizeof(float));
-                for (int n = 0; n < config->num_filters; n++)
-                {
-                    config->filter[i][j][c][n] = filter[i][j][c][n];
-                }
-            }
-        }
-    }
-
-    config->filter = malloc(config->kernel_height * sizeof(float ***));
-    for (int i = 0; i < config->kernel_height; i++)
-    {
-        config->filter[i] = malloc(config->kernel_width * sizeof(float **));
-        for (int j = 0; j < config->kernel_width; j++)
-        {
-            config->filter[i][j] = malloc(config->num_filters * sizeof(float *));
-            for (int n = 0; n < config->num_filters; n++)
-            {
-                config->filter[i][j][n] = malloc(config->image_channels * sizeof(float));
-                for (int c = 0; c < config->image_channels; c++)
-                {
-                    config->filter[i][j][n][c] = filter[i][j][n][c];
-                }
-            }
-        }
-    }
 
     int image_height = 5;
     int image_width = 5;
@@ -149,15 +92,112 @@ int main()
             }
         }
     }
-    int output_height = 0, output_width = 0;
 
-    // int output_height = ((image_height - 1) * config->stride[0]) + config->kernel_height - 1;
-    // int output_width = ((image_width - 1) * config->stride[1]) + config->kernel_width - 1;
-    // Your code to calculate and fill the output tensor goes here
+    config->image_channels = sizeof(filter[0][0][0]) / sizeof(filter[0][0][0][0]);
+    config->kernel_height = sizeof(filter) / sizeof(filter[0]);
+    config->kernel_width = sizeof(filter[0]) / sizeof(filter[0][0]);
+    config->num_filters = sizeof(filter[0][0]) / sizeof(filter[0][0][0]);
+
+    config->stride = malloc(2 * sizeof(int));
+    for (int i = 0; i < 2; i++)
+    {
+        config->stride[i] = stride_values[i];
+    }
+
+    config->dilation = malloc(2 * sizeof(int));
+    for (int i = 0; i < 2; i++)
+    {
+        config->dilation[i] = dilation_values[i];
+    }
+
+    config->bias = malloc(config->num_filters * sizeof(float));
+    for (int i = 0; i < config->num_filters; i++)
+    {
+        config->bias[i] = transpconv2d_bias[i];
+    }
+
+    config->filter = malloc(config->kernel_height * sizeof(float ***));
+    for (int i = 0; i < config->kernel_height; i++)
+    {
+        config->filter[i] = malloc(config->kernel_width * sizeof(float **));
+        for (int j = 0; j < config->kernel_width; j++)
+        {
+            config->filter[i][j] = malloc(config->image_channels * sizeof(float *));
+            for (int c = 0; c < config->image_channels; c++)
+            {
+                config->filter[i][j][c] = malloc(config->num_filters * sizeof(float));
+                for (int n = 0; n < config->num_filters; n++)
+                {
+                    config->filter[i][j][c][n] = filter[i][j][c][n];
+                }
+            }
+        }
+    }
+
+    config->filter = malloc(config->kernel_height * sizeof(float ***));
+    for (int i = 0; i < config->kernel_height; i++)
+    {
+        config->filter[i] = malloc(config->kernel_width * sizeof(float **));
+        for (int j = 0; j < config->kernel_width; j++)
+        {
+            config->filter[i][j] = malloc(config->num_filters * sizeof(float *));
+            for (int n = 0; n < config->num_filters; n++)
+            {
+                config->filter[i][j][n] = malloc(config->image_channels * sizeof(float));
+                for (int c = 0; c < config->image_channels; c++)
+                {
+                    config->filter[i][j][n][c] = filter[i][j][n][c];
+                }
+            }
+        }
+    }
+
+    
+    int output_height, output_width ;
 
     float ***output = transpconv2d_execution(image, image_height, image_width, image_channel,
-                                             config->filter, config->num_filters, config->kernel_height, config->kernel_width, output_height, output_width, config->bias,
+                                             config->filter, config->num_filters, config->kernel_height, config->kernel_width, &output_height, &output_width, config->bias,
                                              config->num_groups, config->stride, config->dilation);
+    
+    // Printing the result
+    for (int i = 0; i < output_height; i++)
+    {
+        for (int j = 0; j < output_width; j++)
+        {
+            for (int f = 0; f < config->num_filters; f++)
+            {
+                printf("%.9lf ", output[i][j][f]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+
+    // Free memory allocated for image
+    for (int h = 0; h < image_height; h++)
+    {
+        for (int w = 0; w < image_width; w++)
+        {
+            free(image[h][w]);
+        }
+        free(image[h]);
+    }
+    free(image);
+
+    // Free memory allocated for filters
+    for (int i = 0; i < config->kernel_height; i++)
+    {
+        for (int j = 0; j < config->kernel_width; j++)
+        {
+            for (int f = 0; f < config->num_filters; f++)
+            {
+                free(config->filter[i][j][f]);
+            }
+            free(config->filter[i][j]);
+        }
+        free(config->filter[i]);
+    }
+    free(config->filter);
     
     return 0;
 }
