@@ -85,7 +85,7 @@ float ***conv2d_execution(float ***image, int image_height, int image_width, int
                           int num_groups, int *stride, int *dilation)
 {
     int kernel_channels = image_channels/num_groups;
-    if (image == NULL || filters == NULL || stride == NULL || *output_height == 0 || *output_width == 0 || dilation == NULL)
+    if (image == NULL || filters == NULL || stride == NULL || dilation == NULL)
     {
         printf("Error: Invalid input parameters.\n");
         return NULL;
