@@ -107,7 +107,7 @@ float ***conv2d_execution(float ***image, int image_height, int image_width, int
     }
     else if (num_filters % num_groups != 0 || image_channels % num_groups != 0 )
     {
-        printf("Error: Number of groups does not evenly divide the number of filters.\n");
+        printf("Error: Number of groups does not evenly divide the number of filters or image channels.\n");
         return NULL;
     }
     else if (num_groups <= 0 || num_groups > num_filters ||num_groups > image_channels)
