@@ -5,6 +5,7 @@
 
 float ****kernel_dilation(float ****filters, int *kernel_height, int *kernel_width, int image_channels, int num_filters, int *dilation)
 {
+
     int new_kernel_height = (*kernel_height - 1) * dilation[0] + 1;
     int new_kernel_width = (*kernel_width - 1) * dilation[1] + 1;
     if (new_kernel_height <= 0 || new_kernel_width <= 0)
@@ -83,9 +84,9 @@ float ****kernel_dilation(float ****filters, int *kernel_height, int *kernel_wid
 float ***transpconv2d_execution(float ***image, int image_height, int image_width, int image_channels,
                                 float ****filters, int num_filters, int kernel_height, int kernel_width,
                                 int *output_height, int *output_width, float *bias,
-                                int num_groups, int *stride, int *dilation)
+                                int *stride, int *dilation)
 {
-    int kernel_channels = image_channels/num_groups;
+
     if (image == NULL || filters == NULL || stride == NULL || dilation == NULL)
     {
         printf("Error: Invalid input parameters.\n");
@@ -93,32 +94,22 @@ float ***transpconv2d_execution(float ***image, int image_height, int image_widt
     }
     else if (stride[0] <= 0 || stride[1] <= 0)
     {
-        printf("Error: Stride Value should be greater than 0");
+        printf("Error: Stride Value should be greater than 0.\n");
         return NULL;
     }
     else if (dilation[0] <= 0 || dilation[1] <= 0)
     {
-        printf("Error: Dilation Value should be greater than 0");
+        printf("Error: Dilation Value should be greater than 0.\n");
+        return NULL;
+    }
+    else if (dilation[0] != dilation[1])
+    {
+        printf("Error: Dilation Values should be equal to each than.\n");
         return NULL;
     }
     else if ((stride[0] > 1 && dilation[0] > 1) || (stride[1] > 1 && dilation[1] > 1) || (stride[0] > 1 && dilation[1] > 1) || (stride[1] > 1 && dilation[0] > 1))
     {
-        printf("Error: Both stride and dilation can not be greater than 1");
-        return NULL;
-    }
-    else if (num_filters % num_groups != 0 || image_channels % num_groups != 0 )
-    {
-        printf("Error: Number of groups does not evenly divide the number of filters or image channels.\n");
-        return NULL;
-    }
-    else if (num_groups <= 0 || num_groups > num_filters ||num_groups > image_channels)
-    {
-        printf("Error: Number of groups must be a positive integer and not exceed the number of filters.\n");
-        return NULL;
-    }
-    else if (image_channels != kernel_channels*num_groups)
-    {
-        printf("Error: Invalid number of channels for kernel.\n");
+        printf("Error: Both stride and dilation can not be greater than 1.\n");
         return NULL;
     }
     else if (kernel_height <= 0 || kernel_width <= 0)
@@ -127,18 +118,32 @@ float ***transpconv2d_execution(float ***image, int image_height, int image_widt
         return NULL;
     }
 
-    *output_height = ((image_height - 1) * stride[0]) + kernel_height;
-    *output_width = ((image_width - 1) * stride[1]) + kernel_width;
+    if (kernel_height > 1 && kernel_width > 1)
+    {
+        filters = kernel_dilation(filters, &kernel_height, &kernel_width, image_channels, num_filters, dilation);
+    }
+
+    if (stride[0] > kernel_height)
+    {
+        *output_height = (image_height * stride[0]);
+    }
+    else
+    {
+        *output_height = ((image_height - 1) * stride[0]) + (kernel_height);
+    }
+    if (stride[1] > kernel_width)
+    {
+        *output_width = (image_width * stride[1]);
+    }
+    else
+    {
+        *output_width = ((image_width - 1) * stride[1]) + (kernel_width);
+    }
+
     if (*output_height <= 0 || *output_width <= 0)
     {
         printf("Error: Calculated output dimensions are invalid.\n");
         return NULL;
-    }
-
-    if (kernel_height > 1 && kernel_width > 1)
-    {
-        
-        filters = kernel_dilation(filters, &kernel_height, &kernel_width, kernel_channels, num_filters, dilation);
     }
 
     float ***result = (float ***)calloc(sizeof(float **), *output_height);
@@ -150,35 +155,30 @@ float ***transpconv2d_execution(float ***image, int image_height, int image_widt
             result[h][w] = (float *)calloc(sizeof(float), num_filters);
         }
     }
-    int group_num_filter = (num_filters / num_groups);
+
     int res_width = 0;
     int res_height = 0;
 
-    // Perform convolution
-    for (int group = 0; group < num_groups; group++)
+
+    // Perform transpose convolution
+    for (int f = 0; f < num_filters; f++)
     {
-        int filter_start = group * group_num_filter;
-        int filter_end = (group + 1) * group_num_filter;
-        for (int f = filter_start; f < filter_end; f++)
+        for (int i = 0; i < image_height; i++)
         {
-            for (int i = 0; i < image_height; i++)
+            for (int j = 0; j < image_width; j++)
             {
-                for (int j = 0; j < image_width; j++)
+                float temp = 0.0;
+                for (int c = 0; c < image_channels; c++)
                 {
-                    float temp = 0.0;
-                    int group_kernel_channels = (image_channels / num_groups);
-                    for (int c = 0; c < group_kernel_channels; c++)
+                    for (int ki = 0; ki < kernel_height; ki++)
                     {
-                        for (int ki = 0; ki < kernel_height; ki++)
+                        for (int kj = 0; kj < kernel_width; kj++)
                         {
-                            for (int kj = 0; kj < kernel_width; kj++)
-                            {
-                                int group_image_channels = c + (group * group_kernel_channels);
-                                temp = image[i][j][group_image_channels] * filters[ki][kj][f][c];
-                                res_height = (stride[0] * i) + ki;
-                                res_width = (stride[1] * j) + kj;
-                                result[res_height][res_width][f] += temp;
-                            }
+
+                            temp = image[i][j][c] * filters[ki][kj][f][c];
+                            res_height = (stride[0] * i) + ki;
+                            res_width = (stride[1] * j) + kj;
+                            result[res_height][res_width][f] += temp;
                         }
                     }
                 }
@@ -197,7 +197,6 @@ float ***transpconv2d_execution(float ***image, int image_height, int image_widt
             }
         }
     }
-
 
     return result;
 }
