@@ -1,2 +1,0 @@
-gcc GRU_WEIGHT_DIVIDED.c weight.c -o gru
-gru.exe
